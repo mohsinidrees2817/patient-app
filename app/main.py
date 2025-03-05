@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# add cors here
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,16 +16,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# New path to Next.js output directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Points to backend/
-OUT_DIR = os.path.join(BASE_DIR, "../static/out")  # Points to backend/frontend/out
+OUT_DIR = os.path.join(BASE_DIR, "../static/out")  # Points to backend/static/out
 
 # Ensure the directory exists before mounting
 if not os.path.exists(OUT_DIR):
     raise RuntimeError(f"Directory '{OUT_DIR}' does not exist")
 
 
-# API Routes (Must be defined before mounting static files)
 @app.get("/api/health")
 async def health_check():
     return {"status": "OK", "message": "Backend is running!"}

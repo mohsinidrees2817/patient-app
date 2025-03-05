@@ -8,7 +8,7 @@ export default function Home() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/health")
+    fetch("/api/health")
       .then((response) => response.json())
       .then((data) => setApiResponse(data))
       .catch((err) => setError("Failed to connect to backend"));
@@ -17,7 +17,7 @@ export default function Home() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/users");
+        const response = await fetch("/api/users");
         const data = await response.json();
         console.log(data.users, "response");
         setUsers(data.users);

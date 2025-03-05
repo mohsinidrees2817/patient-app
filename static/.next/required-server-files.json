@@ -97,7 +97,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/Users/mohsinidrees/Desktop/patient app/backend/frontend",
+    "outputFileTracingRoot": "/Users/mohsinidrees/Desktop/patient app/backend/static",
     "experimental": {
       "nodeMiddleware": false,
       "cacheLife": {
@@ -175,7 +175,7 @@
       "forceSwcTransforms": false,
       "largePageDataBytes": 128000,
       "turbo": {
-        "root": "/Users/mohsinidrees/Desktop/patient app/backend/frontend"
+        "root": "/Users/mohsinidrees/Desktop/patient app/backend/static"
       },
       "typedRoutes": false,
       "typedEnv": false,
@@ -281,7 +281,7 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.js"
   },
-  "appDir": "/Users/mohsinidrees/Desktop/patient app/backend/frontend",
+  "appDir": "/Users/mohsinidrees/Desktop/patient app/backend/static",
   "relativeAppDir": "",
   "files": [
     ".next/routes-manifest.json",
