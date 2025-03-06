@@ -2,8 +2,16 @@
   "version": 3,
   "pages404": true,
   "caseSensitive": false,
-  "basePath": "",
+  "basePath": "/jupyterlab/default/proxy/8000",
   "redirects": [
+    {
+      "source": "/jupyterlab/default/proxy/8000",
+      "destination": "/jupyterlab/default/proxy/8000/",
+      "basePath": false,
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^/jupyterlab/default/proxy/8000$"
+    },
     {
       "source": "/:file((?!\\.well-known(?:/.*)?)(?:[^/]+/)*[^/]+\\.\\w+)/",
       "destination": "/:file",

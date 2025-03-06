@@ -21,7 +21,7 @@
       256,
       384
     ],
-    "path": "/_next/image/",
+    "path": "/jupyterlab/default/proxy/8000/_next/image/",
     "loader": "default",
     "loaderFile": "",
     "domains": [],

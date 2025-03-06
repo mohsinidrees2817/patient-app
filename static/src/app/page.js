@@ -7,26 +7,28 @@ export default function Home() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
+
   useEffect(() => {
-    fetch("/api/health")
+    fetch(`${API_BASE}/api/health`)
       .then((response) => response.json())
       .then((data) => setApiResponse(data))
       .catch((err) => setError("Failed to connect to backend"));
-  }, []);
+  }, [API_BASE]);
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch("/api/users");
+        const response = await fetch(`${API_BASE}/api/users`);
         const data = await response.json();
-        console.log(data.users, "response");
+        console.log("Users Response:", data.users);
         setUsers(data.users);
-      } catch {
+      } catch (error) {
         setError("Failed to fetch users");
       }
     };
     fetchUsers();
-  }, []);
+  }, [API_BASE]);
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
