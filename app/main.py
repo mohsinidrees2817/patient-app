@@ -1,9 +1,12 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import asyncio
 
 
 app = FastAPI()
@@ -24,29 +27,35 @@ if not os.path.exists(OUT_DIR):
     raise RuntimeError(f"Directory '{OUT_DIR}' does not exist")
 
 
-@app.get("/api/health")
-async def health_check():
-    return {"status": "OK", "message": "Backend is running!"}
+async def generate_summary(row: dict):
+    try:
+        patient_id = row.get("Patient ID")  # Extract Patient ID from the row object
+        if not patient_id:
+            raise HTTPException(status_code=400, detail="Patient ID is required")
+
+        # Example summary text
+        summary_text = f"Final summary for patient {patient_id}. This patient is undergoing physical therapy."
+
+        for word in summary_text.split():  
+            yield word + " "  
+            await asyncio.sleep(0.2)  
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/users")
-async def get_users():
-    users = [
-        {"id": 1, "name": "Alice", "email": "alice@example.com"},
-        {"id": 2, "name": "Bob", "email": "bob@example.com"},
-        {"id": 3, "name": "Charlie", "email": "charlie@example.com"},
-    ]
-    return JSONResponse(content={"users": users})
+@app.post("/generate-summary")
+async def get_summary(request: Request):
+    row = await request.json()  
+    print("Received row data:", row)  
+    return StreamingResponse(generate_summary(row), media_type="text/plain")
 
 
-class User(BaseModel):
-    name: str
-    email: str
-
-
-@app.post("/api/users")
-async def create_user(user: User):
-    return JSONResponse(content={"message": "User created!", "user": user.dict()})
+@app.post("/generate-summary")
+async def get_summary(request: Request):
+    row = await request.json()  
+    print("Received row data:", row)  
+    return StreamingResponse(generate_summary(row), media_type="text/plain")
 
 
 # Mount Next.js static files AFTER defining API routes

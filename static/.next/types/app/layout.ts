@@ -1,4 +1,4 @@
-// File: /Users/mohsinidrees/Desktop/patient app/backend/static/src/app/layout.js
+// File: /Users/mohsinidrees/Desktop/upwork-patient/patient-app/static/src/app/layout.js
 import * as entry from '../../../src/app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
