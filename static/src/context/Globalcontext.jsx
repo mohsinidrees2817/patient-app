@@ -10,8 +10,15 @@ export const MainProvider = ({ children }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [tableData, setTableData] = useState([]);
   const [proccesingState, setProccesingState] = useState(false);
+  const [files, setFiles] = useState([]);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
+
+  const allowedFileTypes = [
+    "text/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ];
 
   const parseFile = (file) => {
     return new Promise((resolve) => {
@@ -108,6 +115,65 @@ export const MainProvider = ({ children }) => {
     setTableData(filesWithData[0].tableData);
   };
 
+  const handleFileChange = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    const filteredFiles = selectedFiles.filter((file) =>
+      allowedFileTypes.includes(file.type)
+    );
+
+    if (filteredFiles.length > 0) {
+      setFiles((prevFiles) => [...prevFiles, ...filteredFiles]);
+      handleFileUpload(filteredFiles);
+    }
+  };
+
+  const handleFileSelect = (file) => {
+    setSelectedFile(file);
+
+    const existingFileData = data.find((item) => item.file.name === file.name);
+
+    if (existingFileData) {
+      setTableData(existingFileData.tableData);
+    }
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    const droppedFiles = Array.from(event.dataTransfer.files);
+    const filteredFiles = droppedFiles.filter((file) =>
+      allowedFileTypes.includes(file.type)
+    );
+
+    if (filteredFiles.length > 0) {
+      setFiles((prevFiles) => [...prevFiles, ...filteredFiles]);
+      setData((prevData) => [...prevData, ...filteredFiles]);
+    }
+  };
+
+  const handleRemoveFile = (file) => {
+    setData((prevData) =>
+      prevData.filter((item) => item.file.name !== file.name)
+    );
+
+    setFiles((prevFiles) =>
+      prevFiles.filter((prevFile) => prevFile.name !== file.name)
+    );
+
+    if (selectedFile?.name === file.name) {
+      const remainingFiles = data.filter(
+        (item) => item.file.name !== file.name
+      );
+
+      if (remainingFiles.length > 0) {
+        setSelectedFile(remainingFiles[0].file);
+        setTableData(remainingFiles[0].tableData);
+      } else {
+        setSelectedFile(null);
+        setTableData([]);
+      }
+    }
+  };
+
   const startStreaming = async (file) => {
     const fileData = data.find((item) => item.file.name === file.name);
     if (!fileData || fileData.status !== "Pending") return;
@@ -121,6 +187,10 @@ export const MainProvider = ({ children }) => {
 
     for (let i = 0; i < fileData.tableData.length; i++) {
       const row = fileData.tableData[i];
+
+      if (row.status === "Done") {
+        continue;
+      }
 
       updateRowStatus(i, "In Progress");
 
@@ -169,17 +239,34 @@ export const MainProvider = ({ children }) => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let summary = "";
+      let classification = "";
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        summary += decoder.decode(value, { stream: true });
-        updateRowSummary(rowIndex, summary);
+
+        const chunk = decoder.decode(value, { stream: true });
+
+        if (chunk.includes("summary:")) {
+          const summaryChunk = chunk.replace("summary:", "").trim();
+          summary += summaryChunk + " ";
+          updateRowSummary(rowIndex, summary);
+        } else if (chunk.includes("classification:")) {
+          const classificationChunk = chunk
+            .replace("classification:", "")
+            .trim();
+          classification += classificationChunk + " ";
+          updateRowClassification(rowIndex, classification); 
+        }
       }
-      return summary;
+
+      updateRowStatus(rowIndex, "Done");
     } catch (error) {
       console.error("Error streaming summary:", error);
       updateRowStatus(rowIndex, "Error!");
       updateRowSummary(rowIndex, "");
+      updateRowClassification(rowIndex, "");
+
       setData((prevData) =>
         prevData.map((item) =>
           item.file.name === file.name
@@ -191,6 +278,7 @@ export const MainProvider = ({ children }) => {
                         ...r,
                         status: "Error!",
                         summary: "",
+                        classification: "",
                       }
                     : r
                 ),
@@ -198,14 +286,13 @@ export const MainProvider = ({ children }) => {
             : item
         )
       );
-
-      return "";
     }
   };
 
-  const updateRowStatus = (index, status) => {
+  const updateRowClassification = (rowIndex, classification) => {
+    
     setTableData((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, status } : row))
+      prev.map((row, i) => (i === rowIndex ? { ...row, classification } : row))
     );
 
     setData((prevData) =>
@@ -214,7 +301,7 @@ export const MainProvider = ({ children }) => {
           ? {
               ...item,
               tableData: item.tableData.map((row, idx) =>
-                idx === index ? { ...row, status } : row
+                idx === rowIndex ? { ...row, classification } : row
               ),
             }
           : item
@@ -241,14 +328,36 @@ export const MainProvider = ({ children }) => {
     );
   };
 
+  const updateRowStatus = (index, status) => {
+    setTableData((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, status } : row))
+    );
+
+    setData((prevData) =>
+      prevData.map((item) =>
+        item.file.name === selectedFile.name
+          ? {
+              ...item,
+              tableData: item.tableData.map((row, idx) =>
+                idx === index ? { ...row, status } : row
+              ),
+            }
+          : item
+      )
+    );
+  };
+
   const updateSummaryInGlobalState = (file, rowIndex, newSummary) => {
     setData((prevData) =>
       prevData.map((item) =>
         item.file.name === file.name
           ? {
               ...item,
+              status: "Pending",
               tableData: item.tableData.map((row, idx) =>
-                idx === rowIndex ? { ...row, summary: newSummary } : row
+                idx === rowIndex
+                  ? { ...row, summary: newSummary, status: "Pending" }
+                  : row
               ),
             }
           : item
@@ -272,6 +381,12 @@ export const MainProvider = ({ children }) => {
         updateSummaryInGlobalState,
         proccesingState,
         setProccesingState,
+        files,
+        setFiles,
+        handleFileChange,
+        handleFileSelect,
+        handleDrop,
+        handleRemoveFile,
       }}
     >
       {children}

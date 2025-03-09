@@ -19,25 +19,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Points to backend/
-OUT_DIR = os.path.join(BASE_DIR, "../static/out")  # Points to backend/static/out
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
+OUT_DIR = os.path.join(BASE_DIR, "../static/out")  
 
-# Ensure the directory exists before mounting
 if not os.path.exists(OUT_DIR):
     raise RuntimeError(f"Directory '{OUT_DIR}' does not exist")
 
 
-async def generate_summary(row: dict):
+async def generate_summary_and_classification(row: dict):
     try:
-        patient_id = row.get("Patient ID")  # Extract Patient ID from the row object
+        patient_id = row.get("Patient ID")
         if not patient_id:
             raise HTTPException(status_code=400, detail="Patient ID is required")
 
-        # Example summary text
         summary_text = f"Final summary for patient {patient_id}. This patient is undergoing physical therapy."
+        classification_text = f"High Risk"  
 
-        for word in summary_text.split():  
-            yield word + " "  
+        for word in summary_text.split():
+            yield f"summary:{word} "  
+            await asyncio.sleep(0.2) 
+
+        for word in classification_text.split():
+            yield f"classification:{word} " 
             await asyncio.sleep(0.2)  
 
     except Exception as e:
@@ -45,17 +48,12 @@ async def generate_summary(row: dict):
 
 
 @app.post("/generate-summary")
-async def get_summary(request: Request):
-    row = await request.json()  
-    print("Received row data:", row)  
-    return StreamingResponse(generate_summary(row), media_type="text/plain")
+async def get_summary_and_classification(request: Request):
+    row = await request.json()
+    return StreamingResponse(
+        generate_summary_and_classification(row), media_type="text/plain"
+    )
 
-
-@app.post("/generate-summary")
-async def get_summary(request: Request):
-    row = await request.json()  
-    print("Received row data:", row)  
-    return StreamingResponse(generate_summary(row), media_type="text/plain")
 
 
 # Mount Next.js static files AFTER defining API routes

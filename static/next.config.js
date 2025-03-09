@@ -2,13 +2,12 @@
 const nextConfig = {
   output: "export",
   trailingSlash: true,
-  assetPrefix: "/jupyterlab/default/proxy/8000", // Ensures static assets are served correctly
-  basePath: "/jupyterlab/default/proxy/8000", // Ensures Next.js paths match proxy routing
+  assetPrefix: "/jupyterlab/default/proxy/8000",
+  basePath: "/jupyterlab/default/proxy/8000",
 };
 
 module.exports = nextConfig;
 
-// module.exports = nextConfig;
 // /** @type {import('next').NextConfig} */
 // const nextConfig = {};
 

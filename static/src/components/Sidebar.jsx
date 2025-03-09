@@ -1,59 +1,22 @@
 "use client";
-import { useState } from "react";
-import { FaFileCsv, FaFileExcel, FaFileAlt, FaCheck } from "react-icons/fa";
+import {
+  FaFileCsv,
+  FaFileExcel,
+  FaFileAlt,
+  FaCheck,
+} from "react-icons/fa";
 import { useMainProvider } from "../context/Globalcontext";
 
 const Sidebar = () => {
   const {
-    data,
     selectedFile,
-    setSelectedFile,
-    handleFileUpload,
-    setTableData,
     proccesingState,
+    files,
+    handleFileChange,
+    handleFileSelect,
+    handleDrop,
+    handleRemoveFile,
   } = useMainProvider();
-  const [files, setFiles] = useState([]);
-
-  const allowedFileTypes = [
-    "text/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ];
-
-  const handleFileChange = (event) => {
-    const selectedFiles = Array.from(event.target.files);
-    const filteredFiles = selectedFiles.filter((file) =>
-      allowedFileTypes.includes(file.type)
-    );
-
-    if (filteredFiles.length > 0) {
-      setFiles((prevFiles) => [...prevFiles, ...filteredFiles]);
-      handleFileUpload(filteredFiles);
-    }
-  };
-
-  const handleFileSelect = (file) => {
-    setSelectedFile(file);
-
-    const existingFileData = data.find((item) => item.file.name === file.name);
-
-    if (existingFileData) {
-      setTableData(existingFileData.tableData);
-    }
-  };
-
-  const handleDrop = (event) => {
-    event.preventDefault();
-    const droppedFiles = Array.from(event.dataTransfer.files);
-    const filteredFiles = droppedFiles.filter((file) =>
-      allowedFileTypes.includes(file.type)
-    );
-
-    if (filteredFiles.length > 0) {
-      setFiles((prevFiles) => [...prevFiles, ...filteredFiles]);
-      setData((prevData) => [...prevData, ...filteredFiles]);
-    }
-  };
 
   const getFileIcon = (file) => {
     if (!file || !file.name)
@@ -146,7 +109,7 @@ const Sidebar = () => {
                 {files.map((file, index) => (
                   <li
                     key={index}
-                    className={`flex items-center justify-between py-2 rounded-md px-2  ${
+                    className={`flex items-center justify-between py-2 rounded-md px-2 relative  ${
                       selectedFile?.name === file.name ? "bg-[#2d345d]" : ""
                     }  ${
                       proccesingState ? "cursor-not-allowed" : " cursor-pointer"
@@ -172,9 +135,25 @@ const Sidebar = () => {
                         </p>
                       </div>
                     </div>
-                    {selectedFile?.name === file.name && (
-                      <FaCheck className="text-green-400 text-lg" />
-                    )}
+                    <div className="flex items-center">
+                      {selectedFile?.name === file.name && (
+                        <FaCheck className="text-green-400 text-lg mr-2" />
+                      )}
+                      <button
+                        className={`text-red-400  text-lg ${
+                          proccesingState
+                            ? "cursor-not-allowed"
+                            : " cursor-pointer"
+                        }`}
+                        disabled={proccesingState}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFile(file);
+                        }}
+                      >
+                        &times;
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
