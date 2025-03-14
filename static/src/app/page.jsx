@@ -49,7 +49,12 @@ export default function Home() {
       setTableData((prev) =>
         prev.map((row, i) =>
           i === selectedRowIndex
-            ? { ...row, summary: editedSummary, status: "Pending" }
+            ? {
+                ...row,
+                summary: editedSummary,
+                classification: null,
+                status: "Pending",
+              }
             : row
         )
       );
@@ -205,7 +210,8 @@ export default function Home() {
                       </td>
                       <td className="py-4 pl-6 pr-10 border border-[#e4e5e7] text-black text-start relative ">
                         {row.summary}
-                        {row.classification && (
+                        {(row.classification ||
+                          row.classification === null) && (
                           <FaEdit
                             disabled={proccesingState}
                             className={`absolute right-3 top-5 text-lg  transition-colors ${

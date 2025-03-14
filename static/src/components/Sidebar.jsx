@@ -1,13 +1,10 @@
 "use client";
-import {
-  FaFileCsv,
-  FaFileExcel,
-  FaFileAlt,
-  FaCheck,
-} from "react-icons/fa";
+import React, { useRef } from "react";
+import { FaFileCsv, FaFileExcel, FaFileAlt, FaCheck } from "react-icons/fa";
 import { useMainProvider } from "../context/Globalcontext";
 
 const Sidebar = () => {
+
   const {
     selectedFile,
     proccesingState,
@@ -16,6 +13,7 @@ const Sidebar = () => {
     handleFileSelect,
     handleDrop,
     handleRemoveFile,
+    fileInputRef
   } = useMainProvider();
 
   const getFileIcon = (file) => {
@@ -60,6 +58,7 @@ const Sidebar = () => {
               type="file"
               id="fileInput"
               className="hidden"
+              ref={fileInputRef}
               disabled={proccesingState}
               multiple
               accept=".csv, .xls, .xlsx"
@@ -118,41 +117,43 @@ const Sidebar = () => {
                       !proccesingState && handleFileSelect(file);
                     }}
                   >
-                    <div
-                      className={`flex items-center${
+                    <button
+                      className={`text-red-400  text-lg mr-2 ${
                         proccesingState
                           ? "cursor-not-allowed"
                           : " cursor-pointer"
                       }`}
+                      disabled={proccesingState}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveFile(file);
+                      }}
                     >
-                      {getFileIcon(file)}
-                      <div className="ml-2">
-                        <p className="text-[12px] truncate text-white">
-                          {file.name}
-                        </p>
-                        <p className="text-[11px] text-white">
-                          {(file.size / 1024).toFixed(2)} KB
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {selectedFile?.name === file.name && (
-                        <FaCheck className="text-green-400 text-lg mr-2" />
-                      )}
-                      <button
-                        className={`text-red-400  text-lg ${
+                      &times;
+                    </button>
+                    <div className="flex items-center justify-between w-full">
+                      <div
+                        className={`flex items-center${
                           proccesingState
                             ? "cursor-not-allowed"
                             : " cursor-pointer"
                         }`}
-                        disabled={proccesingState}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveFile(file);
-                        }}
                       >
-                        &times;
-                      </button>
+                        {getFileIcon(file)}
+                        <div className="ml-2">
+                          <p className="text-[12px] truncate text-white">
+                            {file.name}
+                          </p>
+                          <p className="text-[11px] text-white">
+                            {(file.size / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        {selectedFile?.name === file.name && (
+                          <FaCheck className="text-green-400 text-lg mr-2" />
+                        )}
+                      </div>
                     </div>
                   </li>
                 ))}

@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -11,6 +11,7 @@ export const MainProvider = ({ children }) => {
   const [tableData, setTableData] = useState([]);
   const [proccesingState, setProccesingState] = useState(false);
   const [files, setFiles] = useState([]);
+  const fileInputRef = useRef(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
 
@@ -35,6 +36,7 @@ export const MainProvider = ({ children }) => {
                 ...row,
                 status: "Pending",
                 summary: "",
+                classification: "",
               }));
               resolve(dataWithStatus);
             },
@@ -61,6 +63,7 @@ export const MainProvider = ({ children }) => {
               ...rowData,
               status: "Pending",
               summary: "",
+              classification: "",
             };
           });
 
@@ -103,6 +106,7 @@ export const MainProvider = ({ children }) => {
           file,
           status: "Pending",
           summary: "",
+          classification: "",
           tableData,
         };
       })
@@ -171,6 +175,9 @@ export const MainProvider = ({ children }) => {
         setSelectedFile(null);
         setTableData([]);
       }
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -256,7 +263,7 @@ export const MainProvider = ({ children }) => {
             .replace("classification:", "")
             .trim();
           classification += classificationChunk + " ";
-          updateRowClassification(rowIndex, classification); 
+          updateRowClassification(rowIndex, classification);
         }
       }
 
@@ -290,7 +297,6 @@ export const MainProvider = ({ children }) => {
   };
 
   const updateRowClassification = (rowIndex, classification) => {
-    
     setTableData((prev) =>
       prev.map((row, i) => (i === rowIndex ? { ...row, classification } : row))
     );
@@ -356,7 +362,12 @@ export const MainProvider = ({ children }) => {
               status: "Pending",
               tableData: item.tableData.map((row, idx) =>
                 idx === rowIndex
-                  ? { ...row, summary: newSummary, status: "Pending" }
+                  ? {
+                      ...row,
+                      summary: newSummary,
+                      classification: null,
+                      status: "Pending",
+                    }
                   : row
               ),
             }
@@ -387,6 +398,7 @@ export const MainProvider = ({ children }) => {
         handleFileSelect,
         handleDrop,
         handleRemoveFile,
+        fileInputRef,
       }}
     >
       {children}
