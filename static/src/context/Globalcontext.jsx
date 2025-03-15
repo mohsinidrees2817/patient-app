@@ -1,5 +1,11 @@
 "use client";
-import React, { createContext, useContext, useState, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useRef,
+  useEffect,
+} from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -12,9 +18,12 @@ export const MainProvider = ({ children }) => {
   const [proccesingState, setProccesingState] = useState(false);
   const [files, setFiles] = useState([]);
   const fileInputRef = useRef(null);
-
+  const [fileProcessingState, setFileProcessingState] = useState({});
+  const [abortControllers, setAbortControllers] = useState({});
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
-
+  const fileProcessingStateRef = useRef({});
+  const [restartTrigger, setRestartTrigger] = useState(null);
+  const [stoppedProcessing, setStoppedProcessing] = useState(false);
   const allowedFileTypes = [
     "text/csv",
     "application/vnd.ms-excel",
@@ -182,20 +191,34 @@ export const MainProvider = ({ children }) => {
   };
 
   const startStreaming = async (file) => {
-    const fileData = data.find((item) => item.file.name === file.name);
-    if (!fileData || fileData.status !== "Pending") return;
-    setProccesingState(true);
+    console.log(`Starting processing for file: ${file.name}`);
 
+    fileProcessingStateRef.current[file.name] = { isPaused: false };
+
+    const fileData = data.find((item) => item.file.name === file.name);
+    if (!fileData || fileData.status !== "Pending") {
+      console.log(`File: ${file.name} is already processed or in progress`);
+      console.log(fileData.status, "fileData.status");
+      return;
+    }
+
+    setProccesingState(true);
     setData((prevData) =>
       prevData.map((item) =>
         item.file.name === file.name ? { ...item, status: "In Progress" } : item
       )
     );
+    console.log("i am here");
 
     for (let i = 0; i < fileData.tableData.length; i++) {
+      if (fileProcessingStateRef.current[file.name]?.isPaused) {
+        console.log(`Processing paused for file: ${file.name}`);
+        return;
+      }
+
       const row = fileData.tableData[i];
 
-      if (row.status === "Done") {
+      if (row.status !== "Pending") {
         continue;
       }
 
@@ -222,77 +245,112 @@ export const MainProvider = ({ children }) => {
       }
     }
 
-    setData((prevData) =>
-      prevData.map((item) =>
-        item.file.name === file.name ? { ...item, status: "Done" } : item
-      )
-    );
+    if (!fileProcessingStateRef.current[file.name]?.isPaused) {
+      setData((prevData) =>
+        prevData.map((item) =>
+          item.file.name === file.name ? { ...item, status: "Done" } : item
+        )
+      );
+    }
 
     setProccesingState(false);
   };
 
-  const streamSummary = async (row, rowIndex, file) => {
+  const streamSummary = async (row, rowIndex, file, signal) => {
     try {
-      const response = await fetch(`${API_BASE}/generate-summary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(row),
-      });
+      // Step 1: Fetch Summary from /stream-summary/
+      const summaryResponse = await fetch(
+        `${API_BASE}/stream-summary?patient_id=${row["Patient ID"]}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          signal,
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!summaryResponse.ok) {
+        throw new Error(`HTTP error! status: ${summaryResponse.status}`);
       }
 
-      const reader = response.body.getReader();
+      const summaryReader = summaryResponse.body.getReader();
       const decoder = new TextDecoder();
       let summary = "";
-      let classification = "";
 
       while (true) {
-        const { done, value } = await reader.read();
+        const { done, value } = await summaryReader.read();
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-
-        if (chunk.includes("summary:")) {
-          const summaryChunk = chunk.replace("summary:", "").trim();
-          summary += summaryChunk + " ";
-          updateRowSummary(rowIndex, summary);
-        } else if (chunk.includes("classification:")) {
-          const classificationChunk = chunk
-            .replace("classification:", "")
-            .trim();
-          classification += classificationChunk + " ";
-          updateRowClassification(rowIndex, classification);
-        }
+        summary += chunk; // Append new data
+        updateRowSummary(rowIndex, summary);
       }
 
-      updateRowStatus(rowIndex, "Done");
-    } catch (error) {
-      console.error("Error streaming summary:", error);
-      updateRowStatus(rowIndex, "Error!");
-      updateRowSummary(rowIndex, "");
-      updateRowClassification(rowIndex, "");
+      console.log(`Final Summary for patient ${row["Patient ID"]}:`, summary);
 
-      setData((prevData) =>
-        prevData.map((item) =>
-          item.file.name === file.name
-            ? {
-                ...item,
-                tableData: item.tableData.map((r, idx) =>
-                  idx === rowIndex
-                    ? {
-                        ...r,
-                        status: "Error!",
-                        summary: "",
-                        classification: "",
-                      }
-                    : r
-                ),
-              }
-            : item
-        )
+      // Prevent classification if summary is empty
+      if (!summary.trim()) {
+        console.error("Empty summary received, skipping classification.");
+        updateRowStatus(rowIndex, "Error: error generating summary");
+        return;
+      }
+
+      // Step 2: Fetch Classification from /classify/ (Streaming)
+      const classificationResponse = await fetch(
+        `${API_BASE}/classify?summary=${encodeURIComponent(summary)}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          signal,
+        }
       );
+
+      if (!classificationResponse.ok) {
+        throw new Error(`HTTP error! status: ${classificationResponse.status}`);
+      }
+
+      const classificationReader = classificationResponse.body.getReader();
+      let classification = "";
+
+      while (true) {
+        const { done, value } = await classificationReader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true }).trim();
+        console.log("chunk", chunk);
+        classification += chunk;
+        updateRowClassification(rowIndex, classification);
+      }
+      updateRowStatus(rowIndex, "Done");
+      setStoppedProcessing(false);
+    } catch (error) {
+      if (error.name === "AbortError") {
+        console.log("Streaming aborted by user");
+      } else {
+        console.error("Error processing summary and classification:", error);
+        updateRowStatus(rowIndex, "Error!");
+        updateRowSummary(rowIndex, "");
+        updateRowClassification(rowIndex, "");
+
+        setData((prevData) =>
+          prevData.map((item) =>
+            item.file.name === file.name
+              ? {
+                  ...item,
+                  tableData: item.tableData.map((r, idx) =>
+                    idx === rowIndex
+                      ? {
+                          ...r,
+                          status: "Error!",
+                          summary: "",
+                          classification: "",
+                        }
+                      : r
+                  ),
+                }
+              : item
+          )
+        );
+      }
     }
   };
 
@@ -376,6 +434,94 @@ export const MainProvider = ({ children }) => {
     );
   };
 
+  const startProcessing = (file) => {
+    console.log(`Resuming processing for file: ${file.name}`);
+    console.log(data, "data");
+    fileProcessingStateRef.current[file.name] = { isPaused: false };
+
+    setFileProcessingState((prev) => ({
+      ...prev,
+      [file.name]: { isPaused: false },
+    }));
+
+    const fileData = data.find((item) => item.file.name === file.name);
+
+    if (fileData) {
+      const hasPendingRows = fileData.tableData.some(
+        (row) => row.status === "Pending"
+      );
+
+      if (hasPendingRows) {
+        startStreaming(file);
+      } else {
+        console.log(`No pending rows left to process for file: ${file.name}`);
+      }
+    }
+  };
+
+  const stopProcessing = (file) => {
+    fileProcessingStateRef.current[file.name] = { isPaused: true };
+    setStoppedProcessing(true);
+
+    setFileProcessingState((prev) => ({
+      ...prev,
+      [file.name]: { isPaused: true },
+    }));
+    setProccesingState(false);
+    setData((prevData) =>
+      prevData.map((item) =>
+        item.file.name === file.name
+          ? {
+              ...item,
+              status: "Pending",
+            }
+          : item
+      )
+    );
+  };
+
+  const restartProcessing = (file) => {
+    console.log(`Restarting processing for file: ${file.name}`);
+
+    fileProcessingStateRef.current[file.name] = { isPaused: false };
+
+    setData((prevData) =>
+      prevData.map((item) =>
+        item.file.name === file.name
+          ? {
+              ...item,
+              status: "Pending",
+              tableData: item.tableData.map((row) => ({
+                ...row,
+                status: "Pending",
+                summary: "",
+                classification: "",
+              })),
+            }
+          : item
+      )
+    );
+
+    setTableData((prevTableData) =>
+      prevTableData.map((row) => ({
+        ...row,
+        status: "Pending",
+        summary: "",
+        classification: "",
+      }))
+    );
+
+    // Set a trigger to restart processing
+    setRestartTrigger(file);
+  };
+
+  useEffect(() => {
+    if (restartTrigger) {
+      startStreaming(restartTrigger);
+      setRestartTrigger(null); // Reset the trigger after processing starts
+    }
+  }, [restartTrigger]);
+
   return (
     <MainContext.Provider
       value={{
@@ -399,6 +545,13 @@ export const MainProvider = ({ children }) => {
         handleDrop,
         handleRemoveFile,
         fileInputRef,
+        startStreaming,
+        stopProcessing,
+        restartProcessing,
+        proccesingState,
+        fileProcessingState,
+        startProcessing,
+        stoppedProcessing,
       }}
     >
       {children}

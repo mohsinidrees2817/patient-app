@@ -8,10 +8,27 @@ export default function Home() {
     selectedFile,
     tableData,
     setTableData,
-    startStreaming,
     updateSummaryInGlobalState,
+    startStreaming,
+    stopProcessing,
+    restartProcessing,
     proccesingState,
+    startProcessing,
+    stoppedProcessing,
   } = useMainProvider();
+
+  const handleStart = () => {
+    startProcessing(selectedFile);
+  };
+
+  const handleStop = () => {
+    console.log("Stop Processing");
+    stopProcessing(selectedFile);
+  };
+
+  const handleRestart = () => {
+    restartProcessing(selectedFile);
+  };
 
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [editedSummary, setEditedSummary] = useState("");
@@ -64,11 +81,6 @@ export default function Home() {
     }
   };
 
-  const handleProcessing = () => {
-    console.log("Processing started");
-    startStreaming(selectedFile);
-  };
-
   return (
     <div className="p-4">
       <div className="flex justify-between items-center">
@@ -84,7 +96,7 @@ export default function Home() {
             className="py-3 px-3 rounded-md text-white text-xs font-bold bg-gradient-to-r from-[#046dfd] via-blue-400 to-[#3cace6] cursor-pointer"
             disabled={tableData.length === 0}
           >
-            Download CSV
+            Download File
           </button>
         )}
       </div>
@@ -92,24 +104,42 @@ export default function Home() {
       {tableData.length > 0 ? (
         <div className="mt-4 overflow-x-auto bg-white   rounded-lg border border-[#e4e5e7] h-full ">
           {selectedFile && (
-            <div className="flex w-full justify-between items-center ">
+            <div className="flex w-full justify-between items-center">
               <p className="text-xl text-[#1e7ce7] rounded-t-2xl text-start py-4 px-4">
                 {selectedFile?.name}
               </p>
 
-              <button
-                onClick={handleProcessing}
-                disabled={
-                  proccesingState ||
-                  tableData.some((row) => row.status === "Pending") === false
-                }
-                className={`py-3 px-3 rounded-md text-white text-xs font-bold bg-gradient-to-r from-[#046dfd] via-blue-400 to-[#3cace6] cursor-pointer mr-4 disabled:opacity-50 disabled:cursor-not-allowed `}
-              >
-                {proccesingState ? "Processing..." : "Start Processing"}
-              </button>
+              <div className="flex gap-2 mr-4">
+                {/* Start Button (Green) */}
+                <button
+                  onClick={handleStart}
+                  disabled={
+                    proccesingState ||
+                    tableData.some((row) => row.status === "Pending") === false
+                  }
+                  className={`py-3 px-3 rounded-md text-white text-xs font-bold bg-gradient-to-r from-green-500 to-green-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Start
+                </button>
+
+                <button
+                  onClick={handleStop}
+                  disabled={!proccesingState}
+                  className={`py-3 px-3 rounded-md text-white text-xs font-bold bg-gradient-to-r from-red-500 to-red-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {stoppedProcessing ? "Stoping..." : "Stop"}
+                </button>
+
+                <button
+                  onClick={handleRestart}
+                  disabled={proccesingState || stoppedProcessing}
+                  className={`py-3 px-3 rounded-md text-white text-xs font-bold bg-gradient-to-r from-blue-500 to-blue-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Restart
+                </button>
+              </div>
             </div>
           )}
-
           <div className="border border-[#e4e5e7] rounded-t-2xl">
             <table className="min-w-full text-white table-fixed">
               <thead className="bg-[#f3f2f7] text-sm text-start ">
