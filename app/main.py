@@ -1,10 +1,10 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
-import asyncio
 import openai
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -43,9 +43,14 @@ async def stream_openai_response(prompt: str, model: str):
             yield chunk.choices[0].delta.content or ""
 
 
-# Step 1: Generate Summary based on patient_id
-@app.get("/stream-summary")
-async def stream_summary(patient_id: str):
+@app.post("/stream-summary")
+async def stream_summary(request: Request):
+    data = await request.json()
+    patient_id = data.get("Patient ID")
+    print("Data recieved", data)
+    if not patient_id:
+        return {"error": "Patient ID is required"}
+
     prompt = f"Generate a random one-line summary for patient ID {patient_id}."
 
     async def generate_summary():
@@ -63,8 +68,8 @@ async def stream_summary(patient_id: str):
 
         async for chunk in response:
             delta = chunk.choices[0].delta
-            if delta.content:  
-                yield delta.content  
+            if delta.content:
+                yield delta.content
 
     return StreamingResponse(generate_summary(), media_type="text/plain")
 
@@ -88,13 +93,13 @@ async def classify(summary: str):
                 },
                 {"role": "user", "content": prompt},
             ],
-            stream=True, 
+            stream=True,
         )
 
         async for chunk in response:
             delta = chunk.choices[0].delta
             if delta.content:
-                yield delta.content 
+                yield delta.content
 
     return StreamingResponse(generate_classification(), media_type="text/plain")
 
@@ -107,7 +112,7 @@ async def process_request(prompt: str):
     async for chunk in stream_openai_response(prompt, "gpt-3.5-turbo"):
         summary += chunk
 
-    classification = await classify(summary)  
+    classification = await classify(summary)
 
     return {"summary": summary, "classification": classification}
 

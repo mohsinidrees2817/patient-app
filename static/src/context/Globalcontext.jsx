@@ -258,43 +258,54 @@ export const MainProvider = ({ children }) => {
 
   const streamSummary = async (row, rowIndex, file, signal) => {
     try {
-      // Step 1: Fetch Summary from /stream-summary/
-      const summaryResponse = await fetch(
-        `${API_BASE}/stream-summary?patient_id=${row["Patient ID"]}`,
-        {
-          method: "GET",
+      let summary = row.summary?.trim() || "";
+
+      if (!summary) {
+        // If the summary is empty (new or user cleared it), generate a new one
+        console.log(`Fetching summary for patient ${row["Patient ID"]}...`);
+
+        const summaryResponse = await fetch(`${API_BASE}/stream-summary`, {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(row),
           signal,
+        });
+
+        if (!summaryResponse.ok) {
+          throw new Error(`HTTP error! status: ${summaryResponse.status}`);
         }
-      );
 
-      if (!summaryResponse.ok) {
-        throw new Error(`HTTP error! status: ${summaryResponse.status}`);
+        const summaryReader = summaryResponse.body.getReader();
+        const decoder = new TextDecoder();
+        summary = "";
+
+        while (true) {
+          const { done, value } = await summaryReader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          summary += chunk;
+          updateRowSummary(rowIndex, summary);
+        }
+
+        console.log(`Final Summary for patient ${row["Patient ID"]}:`, summary);
+
+        // Prevent classification if summary is empty
+        if (!summary.trim()) {
+          console.error("Empty summary received, skipping classification.");
+          updateRowStatus(rowIndex, "Error: error generating summary");
+          return;
+        }
+      } else {
+        console.log(
+          `Using existing summary for patient ${row["Patient ID"]}:`,
+          summary
+        );
       }
 
-      const summaryReader = summaryResponse.body.getReader();
-      const decoder = new TextDecoder();
-      let summary = "";
+      // Step 2: Fetch Classification
+      console.log(`Fetching classification for summary: "${summary}"`);
 
-      while (true) {
-        const { done, value } = await summaryReader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        summary += chunk; // Append new data
-        updateRowSummary(rowIndex, summary);
-      }
-
-      console.log(`Final Summary for patient ${row["Patient ID"]}:`, summary);
-
-      // Prevent classification if summary is empty
-      if (!summary.trim()) {
-        console.error("Empty summary received, skipping classification.");
-        updateRowStatus(rowIndex, "Error: error generating summary");
-        return;
-      }
-
-      // Step 2: Fetch Classification from /classify/ (Streaming)
       const classificationResponse = await fetch(
         `${API_BASE}/classify?summary=${encodeURIComponent(summary)}`,
         {
@@ -309,6 +320,7 @@ export const MainProvider = ({ children }) => {
       }
 
       const classificationReader = classificationResponse.body.getReader();
+      const decoder = new TextDecoder();
       let classification = "";
 
       while (true) {
@@ -320,6 +332,7 @@ export const MainProvider = ({ children }) => {
         classification += chunk;
         updateRowClassification(rowIndex, classification);
       }
+
       updateRowStatus(rowIndex, "Done");
       setStoppedProcessing(false);
     } catch (error) {
